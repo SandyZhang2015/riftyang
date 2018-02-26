@@ -1,0 +1,195 @@
+module: ietf-rift
+  augment /rt:routing/rt:control-plane-protocols/rt:control-plane-protocol:
+    +--rw rift!
+       +--rw node-info
+       |  +--rw systemid             systemid
+       |  +--rw address              inet:ip-address
+       |  +--rw levels?              enumeration
+       |  +--rw name?                string
+       |  +--rw value?               level-value
+       |  +--rw pod?                 uint16
+       |  +--rw hal?                 level-value
+       |  +--rw ol?                  boolean {overload}?
+       |  +--rw ztp?                 boolean {ztp-mode}?
+       |  +--rw bfd?                 boolean {bfd}?
+       |  +--rw default-originate?   boolean {default-route-originate}?
+       |  +--rw flood-reducing?      boolean {flood-reducing}?
+       |  +--rw interfaces* [local-id]
+       |  |  +--rw local-id          uint32
+       |  |  +--rw name?             if:interface-ref
+       |  |  +--rw remote-id?        uint32
+       |  |  +--rw interface-type
+       |  |     +--rw (link-type)?
+       |  |        +--:(northbound)
+       |  |        +--:(southbound)
+       |  |        +--:(east-west)
+       |  |        +--:(l2l)
+       |  +--rw community
+       |  |  +--rw type?     enumeration
+       |  |  +--rw value?    uint64
+       |  |  +--rw action
+       |  |     +--rw (prune-nh-required)?
+       |  |     +--rw (prune-nh-avoid)?
+       |  |     +--rw (drop-if)?
+       |  |     +--rw (drop-if-not)?
+       |  |     +--rw (add-if-node-match)?
+       |  +--rw policy-info {policy}?
+       |     +--rw (direction-type)?
+       |     |  +--:(northbound)
+       |     |  +--:(southbound)
+       |     +--rw pgp
+       |     |  +--rw (direction-type)?
+       |     |  |  +--:(northbound)
+       |     |  |  +--:(southbound)
+       |     |  +--rw (tie-type)?
+       |     |  |  +--:(node)
+       |     |  |  +--:(prefix)
+       |     |  |  +--:(pgp-prefix)
+       |     |  |  +--:(kv)
+       |     |  +--rw originator
+       |     |  |  +--rw systemid    systemid
+       |     |  |  +--rw address     inet:ip-address
+       |     |  |  +--rw levels?     enumeration
+       |     |  |  +--rw name?       string
+       |     |  |  +--rw value?      level-value
+       |     |  |  +--rw pod?        uint16
+       |     |  +--rw nbr
+       |     |     +--rw systemid    systemid
+       |     |     +--rw address     inet:ip-address
+       |     |     +--rw levels?     enumeration
+       |     |     +--rw name?       string
+       |     |     +--rw value?      level-value
+       |     |     +--rw pod?        uint16
+       |     +--rw kv-tie
+       |     |  +--rw (direction-type)?
+       |     |  |  +--:(northbound)
+       |     |  |  +--:(southbound)
+       |     |  +--rw (tie-type)?
+       |     |  |  +--:(node)
+       |     |  |  +--:(prefix)
+       |     |  |  +--:(pgp-prefix)
+       |     |  |  +--:(kv)
+       |     |  +--rw originator
+       |     |  |  +--rw systemid    systemid
+       |     |  |  +--rw address     inet:ip-address
+       |     |  |  +--rw levels?     enumeration
+       |     |  |  +--rw name?       string
+       |     |  |  +--rw value?      level-value
+       |     |  |  +--rw pod?        uint16
+       |     |  +--rw nbr
+       |     |     +--rw systemid    systemid
+       |     |     +--rw address     inet:ip-address
+       |     |     +--rw levels?     enumeration
+       |     |     +--rw name?       string
+       |     |     +--rw value?      level-value
+       |     |     +--rw pod?        uint16
+       |     +--rw node-element
+       |     |  +--rw node-layer?      level-value
+       |     |  +--rw node-nbr-info
+       |     |  |  +--rw nbr-addr?    inet:ip-address
+       |     |  |  +--rw distance?    uint32
+       |     |  |  +--rw nbr-layer?   level-value
+       |     |  |  +--rw cost?        uint32
+       |     |  +--rw link-set* [local-id]
+       |     |     +--rw local-id    uint32
+       |     +--rw prefix-info
+       |        +--rw layer?   inet:ip-prefix
+       |        +--rw cost?    uint32
+       +--ro neighbor
+       |  +--ro nbrs* [systemid remote-id]
+       |     +--ro systemid     systemid
+       |     +--ro remote-id    uint32
+       |     +--ro distance?    uint32
+       |     +--ro local-id?    uint32
+       +--ro database
+       |  +--ro ties* [tie-key]
+       |     +--ro tie-key         uint32
+       |     +--ro (direction-type)?
+       |     |  +--:(northbound)
+       |     |  +--:(southbound)
+       |     +--ro (tie-type)?
+       |     |  +--:(node)
+       |     |  +--:(prefix)
+       |     |  +--:(pgp-prefix)
+       |     |  +--:(kv)
+       |     +--ro originator
+       |     |  +--ro systemid    systemid
+       |     |  +--ro address     inet:ip-address
+       |     |  +--ro levels?     enumeration
+       |     |  +--ro name?       string
+       |     |  +--ro value?      level-value
+       |     |  +--ro pod?        uint16
+       |     +--ro nbr
+       |     |  +--ro systemid    systemid
+       |     |  +--ro address     inet:ip-address
+       |     |  +--ro levels?     enumeration
+       |     |  +--ro name?       string
+       |     |  +--ro value?      level-value
+       |     |  +--ro pod?        uint16
+       |     +--ro seq?            uint32
+       |     +--ro lifetime?       uint16
+       |     +--ro node-element
+       |     |  +--ro node-layer?      level-value
+       |     |  +--ro node-nbr-info
+       |     |  |  +--ro nbr-addr?    inet:ip-address
+       |     |  |  +--ro distance?    uint32
+       |     |  |  +--ro nbr-layer?   level-value
+       |     |  |  +--ro cost?        uint32
+       |     |  +--ro link-set* [local-id]
+       |     |     +--ro local-id    uint32
+       |     +--ro prefix-info
+       |        +--ro layer?   inet:ip-prefix
+       |        +--ro cost?    uint32
+       +--ro kv-store
+          +--ro kvs* [kv-key]
+             +--ro kv-key          uint32
+             +--ro (direction-type)?
+             |  +--:(northbound)
+             |  +--:(southbound)
+             +--ro (tie-type)?
+             |  +--:(node)
+             |  +--:(prefix)
+             |  +--:(pgp-prefix)
+             |  +--:(kv)
+             +--ro originator
+             |  +--ro systemid    systemid
+             |  +--ro address     inet:ip-address
+             |  +--ro levels?     enumeration
+             |  +--ro name?       string
+             |  +--ro value?      level-value
+             |  +--ro pod?        uint16
+             +--ro nbr
+             |  +--ro systemid    systemid
+             |  +--ro address     inet:ip-address
+             |  +--ro levels?     enumeration
+             |  +--ro name?       string
+             |  +--ro value?      level-value
+             |  +--ro pod?        uint16
+             +--ro next-hop-set* [local-id]
+             |  +--ro local-id    uint32
+             +--ro (algorighm-type)?
+             |  +--:(spf)
+             +--ro node-element
+             |  +--ro node-layer?      level-value
+             |  +--ro node-nbr-info
+             |  |  +--ro nbr-addr?    inet:ip-address
+             |  |  +--ro distance?    uint32
+             |  |  +--ro nbr-layer?   level-value
+             |  |  +--ro cost?        uint32
+             |  +--ro link-set* [local-id]
+             |     +--ro local-id    uint32
+             +--ro prefix-info
+                +--ro layer?   inet:ip-prefix
+                +--ro cost?    uint32
+
+  notifications:
+    +---n error-set
+       +--ro tie-level?   level-value
+       +--ro neighbor
+          +--ro layer?      level-value
+          +--ro systemid    systemid
+          +--ro address     inet:ip-address
+          +--ro levels?     enumeration
+          +--ro name?       string
+          +--ro value?      level-value
+          +--ro pod?        uint16
