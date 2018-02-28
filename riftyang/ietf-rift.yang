@@ -30,25 +30,21 @@
         reference "RFC7277";
     }
 
-    import ietf-key-chain {
-        prefix "key-chain";
-        reference "RFC8177";
-    }
-
-    import ietf-routing-types {
-        prefix "rt-types";
-        reference "RFC8294";
-    }
-
     organization
         "IETF RIFT(Routing In Fat Trees) Working Group";
 
     contact
         "WG Web:   <http://tools.ietf.org/wg/rift/>
-         WG List:  <mailto:pim@ietf.org>
+         WG List:  <mailto:rift@ietf.org>
 
          Editor:   Zheng Zhang
-                  <mailto:zhang.zheng@zte.com.cn>";
+                  <mailto:zhang.zheng@zte.com.cn>
+
+         Editor:   Yuehua Wei
+                  <mailto:wei.yuehua@zte.com.cn>
+
+         Editor:   Shaowen Ma
+                  <mailto:mashao@juniper.net>";
 
          description
              "The module defines the YANG definitions for RIFT.
@@ -120,7 +116,7 @@
      * Groupings
      */
     grouping level-flag {
-        leaf levels {
+        leaf level-flag {
             type enumeration {
                 enum "auto" {
                     description "Node derive level automatically. Only applied if 'configured' is undefined.";
@@ -152,19 +148,14 @@
     grouping level-info {
         uses level-flag;
 
-        leaf name {
-            type string;
-            description "The name of this node. It won't be used as the key of node, just used for description.";
-        }
-
-        leaf value {
+        leaf level-value {
             type level-value;
             description "The node's level value.";
         }
         description "The 'level' of node. It indicates the position of node in the Clos and Fat Tree network.";
     }
 
-    grouping base-node-info {
+    grouping node-key {
         leaf systemid {
             type systemid;
             mandatory true;
@@ -172,11 +163,19 @@
         }
         leaf address {
             type inet:ip-address;
-            mandatory true;
             description "The loopback address of node. It can be used to indicate the node with system-id.";
         }
+        description "The key information used to distinguish a node.";
+    }
+
+    grouping base-node-info {
+        uses node-key;
         uses level-info;
 
+        leaf name {
+            type string;
+            description "The name of this node. It won't be used as the key of node, just used for description.";
+        }
         leaf pod {
             type uint16;
             description "Point of Delivery. The self-contained vertical slice of a Clos or Fat Tree network containing normally only level 0 and level 1 nodes. It communicates with nodes in other PoDs via the spine. Nodes in the spine are configured with a PoD of zero.";
@@ -184,12 +183,34 @@
         description "The base information of a node.";
     }
 
+    grouping neighbor {
+        leaf remote-id {
+            type uint32;
+            description "The remote-id to reach this neighbor.";
+        }
+        leaf distance {
+            type uint32;
+            description "The cost value to arrive this neighbor.";
+        }
+        leaf local-id {
+            type uint32;
+            description "The local-id of link connect to this neighbor.";
+        }
+        description "The neighbor information except for systemid.";
+    }
+
     grouping policy {
-        description "The policy information. When the type of pgp/kv is set to 'node', node-element is making sense. When the type of pgp/kv is set to other values except 'node', prefix-info is making sense.";
-        uses direction-type;
+        description "The policy information. When the tie-type of pgp/kv is set to 'node', node-element is making sense. When the tie-type of pgp/kv is set to other values except 'node', prefix-info is making sense.";
+
         uses pg-info;
-        uses node-element;
-        uses prefix-info;
+        container pg-node {
+            uses node-element;
+            description "The node element information used as policy guide information.";
+        }
+        container pg-prefix {
+            uses prefix-info;
+            description "The prefix information used as policy guide information.";
+        }
     }
 
     grouping node {
@@ -228,6 +249,27 @@
         description "The information of local node. Includes base information, configurable parameters and features.";
     }
 
+    grouping link-type {
+        leaf link-type {
+            type enumeration {
+                enum northbound {
+                    description "A link to a node one level up.";
+                }
+                enum southbound {
+                    description "A link to a node one level down.";
+                }
+                enum east-west {
+                    description "A link between two nodes in the same level.";
+                }
+                enum l2l {
+                    description "Leaf to leaf. East-west links at leaf level. It is different from East-west links at other levels.";
+                }
+            }
+            description "The type of a link.";
+        }
+        description "The type of a link.";
+    }
+
     grouping interface {
         list interfaces {
             key "local-id";
@@ -240,27 +282,9 @@
                 type if:interface-ref;
                 description "The interface's name.";
             }
-            leaf remote-id {
-                type uint32;
-                description "The remote-id of this link. The value should be zero if there is no neighbor on it.";
-            }
-            container interface-type {
-                choice link-type {
-                    case northbound {
-                        description "A link to a node one level up.";
-                    }
-                    case southbound {
-                        description "A link to a node one level down.";
-                    }
-                    case east-west {
-                        description "A link between two nodes in the same level.";
-                    }
-                    case l2l {
-                        description "Leaf to leaf. East-west links at leaf level. It is different from East-west links at other levels.";
-                    }
-                    description "The type of a link.";
-                }
-                description "The type of a link.";
+            container intf-type {
+                uses link-type;
+                description "The link type of local interface.";
             }
             description "The interface information on this node.";
         }
@@ -269,56 +293,57 @@
 
     grouping community-action {
         description "The actions apply on a matching of community.";
-        container action {
-            choice prune-nh-required {
-                description "For each next-hop in P.next_hop_set, if the next-hop does not have the community, prune that next-hop from P.next_hop_set.";
-            }
-            choice prune-nh-avoid {
-                description "For each next-hop in P.next_hop_set, if the next-hop has the community, prune that next-hop from P.next_hop_set.";
-            }
-            choice drop-if {
-                description "If node X has community M, discard P.";
-            }
-            choice drop-if-not {
-                description "If node X does not have the community M, discard P.";
-            }
-            choice add-if-node-match {
-                description "If the node X has community S, then add community T to P.community_list.";
+        leaf action {
+            type enumeration {
+                enum prune-nh-required {
+                    description "For each next-hop in P.next_hop_set, if the next-hop does not have the community, prune that next-hop from P.next_hop_set.";
+                }
+                enum prune-nh-avoid {
+                    description "For each next-hop in P.next_hop_set, if the next-hop has the community, prune that next-hop from P.next_hop_set.";
+                }
+                enum drop-if {
+                    description "If node X has community M, discard P.";
+                }
+                enum drop-if-not {
+                    description "If node X does not have the community M, discard P.";
+                }
+                enum add-if-node-match {
+                    description "If the node X has community S, then add community T to P.community_list.";
+                }
             }
             description "The actions apply on a matching of community.";
         }
     }
 
     grouping community {
-        container community {
-            leaf type {
-                type enumeration {
-                    enum top {
-                        description "The direction type of community is toward to top.";
-                    }
-                    enum bottom {
-                        description "The direction type of community is toward to bottom.";
-                    }
+        leaf type {
+            type enumeration {
+                enum top {
+                    description "The direction type of community is toward to top.";
                 }
-                description "community direction type.";
+                enum bottom {
+                    description "The direction type of community is toward to bottom.";
+                }
             }
-            leaf value {
-                type uint64;
-                description "community value.";
-            }
-            uses community-action;
-            description "The community type and value.";
+            description "community direction type.";
         }
+        leaf value {
+            type uint64;
+            description "community value.";
+        }
+        uses community-action;
         description "Community Attribute.";
     }
 
     grouping direction-type {
-        choice direction-type {
-            case northbound {
-                description "It means moving towards the top of the Clos or Fat Tree network.";
-            }
-            case southbound {
-                description "It means moving towards the bottom of the Clos or Fat Tree network.";
+        leaf direction-type {
+            type enumeration {
+                enum northbound {
+                    description "It means moving towards the top of the Clos or Fat Tree network.";
+                }
+                enum southbound {
+                    description "It means moving towards the bottom of the Clos or Fat Tree network.";
+                }
             }
             description "The direction type.";
         }
@@ -326,72 +351,68 @@
     }
 
     grouping node-element {
-        container node-element {
-            leaf node-layer {
+        leaf layer {
+            type level-value;
+            description "The layer of this element.";
+        }
+        container nbr-info {
+            leaf nbr-addr {
+                type inet:ip-address;
+                description "The information used to distinguish a neighbor.";
+            }
+            leaf distance {
+                type uint32;
+                description "The cost value to arrive this neighbor.";
+            }
+            leaf nbr-layer {
                 type level-value;
-                description "The layer of this element.";
+                description "The layer of this neighbor.";
             }
-            container node-nbr-info {
-                leaf nbr-addr {
-                    type inet:ip-address;
-                    description "The information used to distinguish a neighbor.";
-                }
-                leaf distance {
-                    type uint32;
-                    description "The cost value to arrive this neighbor.";
-                }
-                leaf nbr-layer {
-                    type level-value;
-                    description "The layer of this neighbor.";
-                }
-                leaf cost {
-                    type uint32;
-                    description "The cost of this neighbor.";
-                }
-                description "The information of this neighbor.";
+            leaf cost {
+                type uint32;
+                description "The cost of this neighbor.";
             }
+            description "The information of this neighbor.";
+        }
 
-            list link-set {
-                key "local-id";
-                leaf local-id {
-                    type uint32;
-                    description "The local id of link.";
-                }
-                description "The link-set information of this TIE.";
+        list link-set {
+            key "local-id";
+            leaf local-id {
+                type uint32;
+                description "The local id of link.";
             }
-            description "The detail information in NodeElement of a TIE.";
+            description "The link-set information of this TIE.";
         }
         description "The detail information in NodeElement of a TIE.";
     }
 
     grouping prefix-info {
-        container prefix-info {
-            leaf layer {
-                type inet:ip-prefix;
-                description "The prefix information of this TIE.";
-            }
-            leaf cost {
-                type uint32;
-                description "The cost of this prefix.";
-            }
-            description "The detail information in NodeElement of a TIE.";
+        leaf prefix {
+            type inet:ip-prefix;
+            description "The prefix information.";
         }
-        description "The detail information in NodeElement of a TIE.";
+        leaf cost {
+            type uint32;
+            description "The cost of this prefix.";
+        }
+        description "The detail information of prefix.";
     }
 
     grouping tie-type {
-        choice tie-type {
-            case node {
-                description "The node topology information elements.";
-            }
-            case prefix {
-                description "The prefix topology information elements.";
-            }
-            case pgp-prefix {
-                description "The PGP prefix information elements.";
-            }
-            case kv {
-                description "The Key Value information elements.";
+        leaf tie-type {
+            type enumeration {
+                enum node {
+                    description "The node topology information elements.";
+                }
+                enum prefix {
+                    description "The prefix topology information elements.";
+                }
+                enum pgp-prefix {
+                    description "The PGP prefix information elements.";
+                }
+                enum kv {
+                    description "The Key Value information elements.";
+                }
             }
             description "The possible TIE's types.";
         }
@@ -399,17 +420,21 @@
     }
 
     grouping tie-id {
-        uses direction-type;
-        uses tie-type;
-
-        container originator {
-            uses base-node-info;
-            description "The originator information of this TIE.";
+        leaf originator {
+            type systemid;
+            description "The originator's systemid of this TIE.";
         }
-
-        container nbr {
-            uses base-node-info;
-            description "The neighbor information received this TIE from.";
+        container direction {
+            uses direction-type;
+            description "The direction type of this TIE.";
+        }
+        container type {
+            uses tie-type;
+            description "The type of this TIE.";
+        }
+        container link-type {
+            uses link-type;
+            description "The type of link in this TIE.";
         }
         description "TIE is the acronym for 'Topology Information Element'. TIEs are exchanged between RIFT nodes to describe parts of a network such as links and address prefixes. This is the TIE identification information.";
     }
@@ -425,20 +450,33 @@
             }
             description "The lifetime of a TIE.";
         }
-        uses node-element;
-        uses prefix-info;
+        container tie-node {
+            uses node-element;
+            description "The node element information in this TIE.";
+        }
+        container tie-prefix {
+            uses prefix-info;
+            description "The prefix information in this TIE.";
+        }
         description "TIE is the acronym for 'Topology Information Element'. TIEs are exchanged between RIFT nodes to describe parts of a network such as links and address prefixes. This TIE info is used to indicate the state of this TIE. When the type of this TIE is set to 'node', the node-element is making sense. When the type of this TIE is set to other types except for 'node', the prefix-info is making sense.";
     }
 
     grouping pg-info {
         description "Information that is passed in either southbound direction or north-bound direction by the means of diffusion and can be filtered via policies.  Policy-Guidedn Prefixes and KV Ties are examples of Policy-Guided Information.";
-        container pgp {
-            uses tie-id;
-            description "Policy-Guided Prefixes allow to support traffic engineering that cannot be achieved by the means of SPF computation or normal node and prefix S-TIE origination.  S-PGPs are propagated in south direction only and N-PGPs follow northern direction strictly.";
+        leaf pg-type {
+            type enumeration {
+                enum pgp {
+                    description "Policy-Guided Prefixes allow to support traffic engineering that cannot be achieved by the means of SPF computation or normal node and prefix S-TIE origination.  S-PGPs are propagated in south direction only and N-PGPs follow northern direction strictly.";
+                }
+                enum kv-tie {
+                    description "A S-TIE that is carrying a set of key value pairs.  It can be used to distribute information in the southbound direction within the protocol.";
+                }
+            }
+            description "The types of Policy-Guiden Information.";
         }
-        container kv-tie {
+        container pg-common {
             uses tie-id;
-            description "A S-TIE that is carrying a set of key value pairs.  It can be used to distribute information in the southbound direction within the protocol.";
+            description "The brief key information of this policy. It applies to node-element and prefix as well.";
         }
     }
 
@@ -459,7 +497,6 @@
                 type uint32;
                 description "The local id of interface.";
             }
-            /*uses link-info;*/
             description "The next-hop set.";
         }
         description "The next-hop set.";
@@ -479,7 +516,10 @@
                 description "The node information about RIFT.";
                 uses node;
                 uses interface;
-                uses community;
+                container community {
+                    uses community;
+                    description "The community attribute and information.";
+                }
                 container policy-info {
                     if-feature policy;
                     uses policy;
@@ -490,22 +530,8 @@
                 config false;
                 list nbrs {
                     key "systemid remote-id";
-                    leaf systemid {
-                        type systemid;
-                        description "The systemid of this neighbor.";
-                    } 
-                    leaf remote-id {
-                        type uint32;
-                        description "The remote-id to reach this neighbor.";
-                    }
-                    leaf distance {
-                        type uint32;
-                        description "The cost value to arrive this neighbor.";
-                    }
-                    leaf local-id {
-                        type uint32;
-                        description "The local-id of link connect to this neighbor.";
-                    }
+                    uses base-node-info;
+                    uses neighbor;
                     /*uses nbr-status;*/ /*The status will be added in later version.*/
                     description "The information of a neighbor.";
                 }
@@ -515,31 +541,36 @@
             container database {
                 config false;
                 list ties {
-                    key "tie-key";
-                    leaf tie-key {
+                    key "tie-index";
+                    leaf tie-index {
                         type uint32;
                         description "The index of a TIE.";
                     }
-                    uses tie-id;
-                    uses tie-info;
+                    container database-tie {
+                        uses tie-id;
+                        uses tie-info;
+                        description "The TIEs in the database.";
+                    }
                     description "The detail information of a TIE.";
                 }
+                uses algorithm;
                 description "The TIEs information in database.";
             }//database
 
             container kv-store {
                 config false;
                 list kvs {
-                    key "kv-key";
-                    leaf kv-key {
+                    key "kvs-index";
+                    leaf kvs-index {
                         type uint32;
                         description "The index of a kv pair.";
                     }
-                    uses tie-id;
-                    uses nh-set;
-                    uses algorithm;
-                    uses node-element;
-                    uses prefix-info;
+
+                    container kvs-tie {
+                        uses tie-id;
+                        uses tie-info;
+                        description "The TIEs in the kv-store.";
+                    }
                     description "The information used to distinguish a Key/Value pair. When the type of kv is set to 'node', node-element is making sense. When the type of kv is set to other values except 'node', prefix-info is making sense.";
                 }
                 description "The Key/Value store information.";
@@ -558,16 +589,18 @@
      */
     notification error-set {
         description "The errors notification of RIFT.";
-        leaf tie-level {
-            type level-value;
+        container tie-level-error {
+            uses tie-id;
+            uses tie-info;
             description "The level is undefined in the LIEs.";
         }
-        container neighbor {
-            leaf layer {
-                type level-value;
-                description "The neighbor's layer is not valid.";
+        container nbr-error {
+            list nbrs {
+                key "systemid remote-id";
+                uses base-node-info;
+                uses neighbor;
+                description "The information of a neighbor.";
             }
-            uses base-node-info;
             description "The neighbor errors set.";
         }
     }
